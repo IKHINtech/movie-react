@@ -1,21 +1,24 @@
 import React, { Component } from "react";
 import { getMovies } from "../services/fakeMovieService";
 import { getGenres } from "../services/fakeGenreService";
-import Like from "./common/like";
+import MovieTable from "./movieTable";
 import ListGroup from "./common/listGroup";
 import Pagination from "./common/paginate";
 import { paginate } from "../utils/paginate";
+import _ from "lodash";
 
 class Movies extends Component {
   state = {
     movies: [],
     currentPage: 1,
+    sortColumn: { path: "title", order: "asc" },
     pageSize: 4,
     genres: [],
   };
 
   componentDidMount() {
-    this.setState({ movies: getMovies(), genres: getGenres() });
+    const genres = [{ _id: "", name: "All Genres" }, ...getGenres()];
+    this.setState({ movies: getMovies(), genres });
   }
 
   handleDelete = (movie) => {
@@ -34,13 +37,29 @@ class Movies extends Component {
   };
 
   handleGenreSelect = (genre) => {
-    console.log(genre);
+    this.setState({ selectedGenre: genre, currentPage: 1 });
+  };
+  handleShort = (sortColumn) => {
+    this.setState({ sortColumn });
   };
   render() {
     const { length: count } = this.state.movies;
-    const { currentPage, pageSize, movies: allMovies, genres } = this.state;
+    const {
+      currentPage,
+      pageSize,
+      movies: allMovies,
+      genres,
+      sortColumn,
+      selectedGenre,
+    } = this.state;
     if (count === 0) return <p>There are no movie in database</p>;
-    const movies = paginate(allMovies, currentPage, pageSize);
+    const filtered =
+      selectedGenre && selectedGenre._id
+        ? allMovies.filter((m) => m.genre._id === selectedGenre._id)
+        : allMovies;
+
+    const sorted = _.orderBy(filtered, [sortColumn.path], [sortColumn.order]);
+    const movies = paginate(sorted, currentPage, pageSize);
     return (
       <div className="row">
         <div className="row">
@@ -48,50 +67,25 @@ class Movies extends Component {
             <h1>Movie list app using ReactJs</h1>
           </div>
           <div className="col-12 text-center">
-            <p>Showing {count} Movie in database </p>
+            <p>Showing {filtered.length} Movie in database </p>
           </div>
           <div className="col-3">
-            <ListGroup items={genres} onItemSelect={this.handleGenreSelect} />
+            <ListGroup
+              items={genres}
+              onItemSelect={this.handleGenreSelect}
+              selectedItem={this.state.selectedGenre}
+            />
           </div>
           <div className="col-9">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Genre</th>
-                  <th>Stock</th>
-                  <th>Rate</th>
-                  <th>Like</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movies.map((movie) => (
-                  <tr key={movie._id}>
-                    <td>{movie.title}</td>
-                    <td>{movie.genre.name}</td>
-                    <td>{movie.numberInStock}</td>
-                    <td>{movie.dailyRentalRate}</td>
-                    <td>
-                      <Like
-                        liked={movie.liked}
-                        onClick={() => this.handleLike(movie)}
-                      />
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => this.handleDelete(movie)}
-                        className="btn btn-danger btn-sm"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <MovieTable
+              movies={movies}
+              sortColumn={sortColumn}
+              onDelete={this.handleDelete}
+              onLike={this.handleLike}
+              onSort={this.handleShort}
+            />
             <Pagination
-              itemsCount={count}
+              itemsCount={filtered.length}
               currentPage={currentPage}
               pageSize={pageSize}
               onPageChange={this.handdlePageChange}
